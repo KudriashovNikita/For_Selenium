@@ -1,0 +1,151 @@
+using System.Transactions;
+using Microsoft.VisualBasic;
+using OpenQA.Selenium;
+using OpenQA.Selenium.Chrome;
+using OpenQA.Selenium.Support.UI;
+using SeleniumExtras.WaitHelpers;
+
+namespace TestNumber1;
+public class Tests
+{
+    public IWebDriver driver;
+    public WebDriverWait wait;
+    
+    [SetUp]
+    public void Setup()
+    {
+        driver = new ChromeDriver();
+        driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(5);
+        wait = new WebDriverWait(driver, TimeSpan.FromSeconds(5));
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        driver.Quit();
+        driver.Dispose();
+    }
+
+    private void Autorization()
+    {
+        driver.Navigate().GoToUrl("https://staff-testing.testkontur.ru/");
+        var login = driver.FindElement(By.Id("Username"));
+        login.SendKeys("user1");
+        var password = driver.FindElement(By.Id("Password"));
+        password.SendKeys("Qq!2333098");
+        var enter = driver.FindElement(By.Name("button"));
+        enter.Click();
+        wait.Until(ExpectedConditions.ElementToBeClickable(By.CssSelector("[data-tid='Title']")));    
+    }
+    private void First(Func<object, object> value)
+    {
+        throw new NotImplementedException();
+    }
+
+    [Test]
+    public void Autorization_Test() // не вижу смысла перегружать код теста комментами, делали все под чутким руководством
+    {
+        Autorization();
+        Assert.That(driver.Title, Does.Contain("Новости"));
+    }
+
+    [Test]
+    public void Can_Go_To_Communities_Test() // не вижу смысла перегружать код теста комментами, делали все под чутким руководством
+    {
+        Autorization();
+        wait.Until(ExpectedConditions.UrlToBe("https://staff-testing.testkontur.ru/news"));
+        var SideBarMenuButton = driver.FindElement(By.CssSelector("[data-tid='SidebarMenuButton']"));
+        SideBarMenuButton.Click();
+        wait.Until(ExpectedConditions.ElementIsVisible(By.CssSelector("[data-tid='SidePage__root']")));
+        var community = driver.FindElements(By.CssSelector("[data-tid='Community']"))
+        .First(element => element.Displayed);
+        community.Click();
+        wait.Until(ExpectedConditions.UrlToBe("https://staff-testing.testkontur.ru/communities"));
+        var TitlePageElement = driver.FindElement(By.CssSelector("[data-tid='Title']"));
+        Assert.That(TitlePageElement.Text, Does.Contain("Сообщества"));
+    }
+
+    [Test]
+    public void Search_Is_Working_Test()
+    {
+        Autorization(); // авторизация
+        wait.Until(ExpectedConditions.UrlToBe("https://staff-testing.testkontur.ru/news")); //ожидание загрузки нужной страницы
+        var Services = driver.FindElement(By.CssSelector("[data-tid='Services']")); // ищем кнопку "поиск"
+        wait.Until(ExpectedConditions.ElementToBeClickable(By.CssSelector("[data-tid='Services']"))); 
+            // ожидание возможности взаимодействия с кнопкой "поиск"
+        Services.Click(); // клик на "поиск"
+        var Search = driver.FindElement(By.CssSelector("[data-tid='SearchBar']")); // ищем поисковую строку
+        wait.Until(ExpectedConditions.ElementToBeClickable(By.CssSelector("[data-tid='SearchBar']"))); 
+            // ожидание возможности взаимодействия с поисковой строкой
+        Search.Click(); // клик на поисковую строку
+        var SearchInput = driver.FindElement(By.CssSelector("[placeholder='Поиск сотрудника, подразделения, сообщества, мероприятия']")); 
+            // ищем текстовое поле поисковой строки
+            // хотел привязать к data-tid='InputLikeText__input', но так тест не проходит. видимо, не верно определил элемент
+        wait.Until(ExpectedConditions.ElementIsVisible(By.CssSelector("[placeholder='Поиск сотрудника, подразделения, сообщества, мероприятия']")));
+            // ждем отображения текстового поля
+        SearchInput.Clear(); // на всякий случай очищаем, мало-ли какой-то текст сохранился
+        SearchInput.SendKeys("Гусева Ирина Федоровна"); // ввод текста в поисковую строку
+        var ComboBox = driver.FindElement(By.CssSelector("[data-tid='ComboBoxMenu__item']")); 
+            // ищем всплывающий комбо-бокс. Думаю, можно реализовать и без него (через ввод команды "Enter"), но так показалось интереснее
+        Assert.That(ComboBox.Displayed, Is.True, "Комбо-бокс не отображается");
+            // на всякий случай проверяем, что комбо-бокс работает
+        wait.Until(ExpectedConditions.ElementToBeClickable(By.CssSelector("[data-tid='ComboBoxMenu__item']")));
+            // ждем возможности взаимодействия с комбо-боксом
+        ComboBox.Click(); // клик на комбо-бокс
+        var EmployeeName = driver.FindElement(By.CssSelector("[data-tid='EmployeeName']"));
+            // находим элемент с именем найденного сотрудника
+            Assert.Multiple(() => 
+        {
+            Assert.That(EmployeeName.Displayed, Is.True, "Имя сотрудника не отображается"); // проверяем, что элемент с именем сотрудника отоборажается
+            Assert.That(EmployeeName.Text, Is.EqualTo("Гусева Ирина Федоровна"), "Отображаемое имя не соответствует ожидаемому");
+                // проверяем, что нашли именно того, кого искали
+        }); 
+            // спасибо практикам и DeepSeek, рассказали про несколько проверок и как их реализовать в плане синтаксиса =)
+    }
+
+    [Test]
+    public void Can_Find_Moderator_At_Moderatoes_List_At_Communities()
+    {
+        Autorization(); // авторизация
+        driver.Navigate().GoToUrl("https://staff-testing.testkontur.ru/communities/e8ce0b22-dd03-4669-b21d-53c986425976"); // переход к сообществу
+        wait.Until(ExpectedConditions.ElementToBeClickable(By.CssSelector("[data-tid='Members']"))); // ожидание загрузки необходимого элемента
+        var Members = driver.FindElement(By.CssSelector("[data-tid='Members']")); // поиск элемента перехода к списку участников
+        Members.Click(); // переход к нужному меню
+        wait.Until(ExpectedConditions.ElementIsVisible(By.CssSelector("[data-tid='MemberList']"))); 
+            // ожидание отображения необходимой области модального окна
+        var ModeratorsList = driver.FindElement(By.XPath("//span[@data-tid='Item' and text()='Модераторы']")); 
+            // поиск элемента перехода к списку модераторов
+        ModeratorsList.Click(); // клик на переход к списку модераторов
+        wait.Until(ExpectedConditions.ElementIsVisible(By.CssSelector("[data-tid='Caption']"))); // ожидание загрузки необходимого элемента
+        var Moderator = driver.FindElement(By.CssSelector("[data-tid='Caption']")); // получение списка модераторов
+        Assert.That(Moderator.Text,  Is.EqualTo("user1"), "Не удалось найти искомого модератора в списке");
+            // проверка - в списке модераторов есть искомый
+    }
+
+    [Test]
+    public void Can_Post_Comment_To_Publication() // на свою голову решил сделать что-то интереснее
+    {
+        Autorization(); // авторизация
+        driver.Navigate().GoToUrl("https://staff-testing.testkontur.ru/publications/83ecb040-85ba-422f-b8e0-9cff7aa0914c"); // переход к записи
+            // тут я бы почистил все комментарии, сборка теста была бы гораздо проще, но я, к сожалению, пока не понимаю как это сделать
+    var AddComment = driver.FindElement(By.CssSelector("[data-tid='AddComment']")); // поиск кнопки "комментировать"
+    AddComment.Click(); // нажатие на кнопку "комментировать"
+    var SearchInput = driver.FindElement(By.CssSelector("[placeholder='Комментировать...']")); // поиск текстового поля
+    wait.Until(ExpectedConditions.ElementIsVisible(By.CssSelector("[placeholder='Комментировать...']"))); // ожидание отображения текстового поля
+    SearchInput.Clear(); // очистка текстового поля на всякий случай
+    string CurrentTime = DateTime.Now.ToString("dd.MM.yyyy HH:mm:ss"); // генерация уникального текста коммента с текущей датой и временем
+    SearchInput.SendKeys(CurrentTime); // ввод сренерированного текста в поле
+    var SendComment = driver.FindElement(By.CssSelector("[data-tid='SendComment']")); //поиск кнопки "отправить"
+    SendComment.Click(); // нажатие на кнопку "отправить"
+    wait.Until(driver => driver.FindElements(By.CssSelector("[data-tid='TextComment']")).Any(c => c.Text.Contains(CurrentTime)));
+        // ожидание комментария с нашим текстом, спасибо DeepSeek за подсказку синтаксиса =)
+    var AllComments = driver.FindElements(By.CssSelector("[data-tid='TextComment']")); 
+        // поиск всех комментариев. [Data-tid="Comment"] - не уникальный, пришлось придумывать надстройку
+    var LastComment = AllComments.Last(); // поиск последнего комментария из всех
+    var LastCommentText = LastComment.Text;
+        // var LastCommentText = LastComment.FindElement(By.CssSelector("[data-tid='TextComment']")); // поиск текста проследнего комментария
+    Assert.That(LastCommentText, Does.Contain(CurrentTime), "Текст комментария не совпадает. Ожидалось: '{CurrentTime}', получено: '{LastCommentText}'");
+        // проверка - текст последнего комментария соответствует тексту, который мы вводили
+        // понадобилось всего - лишь 30 раз пересобирать тест чтобы от начал работать и еще 5 раз его запустить чтобы убедиться в этом :D
+    }
+}
